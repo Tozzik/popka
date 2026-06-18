@@ -1,0 +1,337 @@
+--------Создание проекта
+
+
+WindowsForms (МАЙКРОСОФТ) NET.8
+nuget:
+Microsoft.EntityFrameworkCore.Design 8.0.27
+Npgsql 8.0.6
+Npgsql.EntityFrameworkCore.PostgreSql 8.0.11
+
+Установка dotnet:
+dotnet tool install --global dotnet-ef
+
+
+
+--------Создание Бд:
+
+Create table users (
+   role varchar(150) check (role in ('Администратор', 'Менеджер', 'Авторизированный клиент')),
+   full_name varchar(250) not null primary key,
+   login varchar(150) not null,
+   password varchar(150) not null
+);
+
+create table products (
+   article varchar(100) primary key,
+   name varchar(150) not null,
+   unit varchar(50) default 'шт.',
+   price decimal(10, 2),
+   supplier varchar(100),
+   namefacturer varchar(150) not null,
+   category varchar(150),
+   discount int check (discount >= 0),
+   quancity int check (quancity >= 0),
+   description text not null,
+   photo text default 'picture.png'
+);
+
+create table pickup_points (
+   id serial primary key,
+   address varchar(255) not null
+);
+
+create table orders(
+   id serial primary key,
+   order_article varchar(255) not null,
+   order_date date not null,
+   dilivery_date date not null,
+   address int references pickup_points(id),
+   full_name varchar(150) references users(full_name),
+   code int not null,
+   status varchar(150) default 'Новый'
+);
+
+
+
+------Dotnet ef dbcontext scaffold "Host=localhost;Database=...;Username=postgres;Password=postgres" -o Models
+
+
+
+------Repos:
+ public class Repos
+ {
+     private readonly OooPosudaContext _dbcontext = new OooPosudaContext();
+     public List<T> readsql<T>(string sql) where T : class
+     {
+         _dbcontext.ChangeTracker.Clear();
+         return _dbcontext.Set<T>().FromSqlRaw(sql).ToList();
+     }
+     public List<T> read<T>() where T : class
+     {
+         return _dbcontext.Set<T>().ToList();
+     }
+
+     public int ExecuteSql(string sql)
+     {
+         return _dbcontext.Database.ExecuteSqlRaw(sql);
+     }
+
+
+ }
+
+
+
+
+------LoginForm.cs:
+
+
+    public readonly Repos _repos = new Repos();
+
+    public Form1()
+    {
+        InitializeComponent();
+    }
+
+    private void btnGuest_Click(object sender, EventArgs e)
+    {
+        ShopForm shopForm = new ShopForm();
+        shopForm.Show();
+        this.Hide();
+    }
+
+    private void Form1_Load(object sender, EventArgs e)
+    {
+
+    }
+
+    private void txtLogin_TextChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void txtPassword_TextChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void btnVxod_Click(object sender, EventArgs e)
+    {
+        try
+        {
+            var chel = _repos.readsql<User>($"SELECT * FROM users WHERE login = '{txtLogin.Text}' AND password = '{txtPassword.Text}' ")[0];
+            MessageBox.Show("Успех ёпта");
+            ShopForm shopform = new ShopForm();
+            shopform.Show();
+            this.Hide();
+
+        }
+        catch
+        {
+            MessageBox.Show("Нвеврный логин или пароль");
+
+        }
+
+    }
+
+    private void btnClose_Click(object sender, EventArgs e)
+    {
+        DialogResult result = MessageBox.Show(
+            "Вы уверены что хотите выйти из программы ? ",
+            "Подтверждение выхода",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+            );
+
+        if (result == DialogResult.Yes)
+        {
+            Application.Exit();
+        }
+        
+    }
+}
+
+
+------ShopForm.cs:
+
+
+
+ public partial class ShopForm : Form
+ {
+     public readonly Repos _repos = new Repos();
+     
+
+     public ShopForm()
+     {
+         InitializeComponent();
+     }
+
+     private void ShopForm_Load(object sender, EventArgs e)
+     {
+         //dataGridView1.DataSource = repos.readsql<Product>("SELECT * FROM products");
+       
+         dataGridView1.DataSource = _repos.read<Product>();
+     }
+     
+
+     private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+     {
+     }
+
+     private void btnCreateOrder_Click(object sender, EventArgs e)
+     {
+         OrderForm orderform = new OrderForm();
+         orderform.Show();
+         this.Hide();
+     }
+
+     private void btnExitShop_Click(object sender, EventArgs e)
+     {
+         Form1 loginform = new Form1();
+         loginform.Show();
+         this.Hide();
+     }
+
+     private void btnDelete_Click(object sender, EventArgs e)
+     {
+
+         MessageBox.Show("Данный товар нельзя удалить так как он есть в заказе");
+     }
+
+     private void btnEdit_Click(object sender, EventArgs e)
+     {
+         EditForm editform = new EditForm();
+         editform.Show();
+         this.Hide();
+     }
+
+     
+
+     private void textBox1_TextChanged_1(object sender, EventArgs e)
+     {
+         dataGridView1.DataSource = _repos.readsql<Product>($"SELECT * FROM products WHERE LOWER(name) LIKE '%{textBox1.Text.ToLower()}%'");
+     }
+
+     private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
+     {
+         dataGridView1.DataSource = _repos.readsql<Product>($"SELECT * FROM products WHERE LOWER(category) LIKE '%{comboBox1.Text.ToLower()}%'");
+     }
+ }
+
+------OrderForm.cs
+
+
+
+public partial class OrderForm : Form
+{
+    public readonly Repos _repos = new Repos();
+    public OrderForm()
+    {
+        InitializeComponent();
+        LoadData();
+    }
+
+    private void btnExit_Click(object sender, EventArgs e)
+    {
+        this.Close();
+        ShopForm shopform = new ShopForm();
+        shopform.Show();
+    }
+
+    private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+    {
+   
+    }
+
+    private void LoadData()
+    {
+        dgvOrder.DataSource = _repos.read<Order>();
+    }
+     
+}
+
+------EditForm.cs
+
+
+
+
+public partial class EditForm : Form
+{
+    public readonly Repos repo = new Repos();
+    public EditForm()
+    {
+        InitializeComponent();
+        LoadData();
+    }
+
+    private void btnExit_Click(object sender, EventArgs e)
+    {
+        ShopForm shopform = new ShopForm();
+        shopform.Show();
+        this.Hide();
+    }
+
+    private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+    {
+
+    }
+    private void LoadData()
+    {
+        dataGridView1.DataSource = repo.read<Product>();
+    }
+
+    private void btnAdd_Click(object sender, EventArgs e)
+    {
+        try
+        {
+            var chel = repo.ExecuteSql($"INSERT INTO products (article, name, unit, price, supplier, manufacturer, category, discount, quantity, description, photo) VALUES ('{textBox1.Text}', '{textBox2.Text}', '{textBox3.Text}', {textBox4.Text}, '{textBox5.Text}', '{textBox6.Text}', '{textBox7.Text}', {textBox8.Text}, '{textBox9.Text}', '{textBox10.Text}', '{textBox11.Text}')");
+            dataGridView1.DataSource = repo.read<Product>();
+            MessageBox.Show("Добавлено");
+        }
+        catch
+        {
+            MessageBox.Show("Ошибка");
+        }
+
+    }
+
+
+
+    private void btnupdate_Click(object sender, EventArgs e)
+    {
+        try
+        {
+            var chel = repo.ExecuteSql($"UPDATE products SET name = '{textBox2.Text}', unit = '{textBox3.Text}', price = {textBox4.Text}, supplier = '{textBox5.Text}', manufacturer = '{textBox6.Text}', category = '{textBox7.Text}', discount = {textBox8.Text}, quantity = {textBox9.Text}, description = '{textBox10.Text}', photo = '{textBox11.Text}' Where article = '{textBox1.Text}'");
+            dataGridView1.DataSource = repo.read<Product>();
+            MessageBox.Show("Таблица обновлена");
+        }
+        catch
+        {
+            MessageBox.Show("Ошибка");
+        }
+
+    }
+
+    private void textBox1_TextChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void textBox2_TextChanged(object sender, EventArgs e)
+    {
+
+    }
+
+    private void btnDelete_Click(object sender, EventArgs e)
+    {
+        try
+        {
+            var chel = repo.ExecuteSql($"DELETE FROM products WHERE article = '{textBox1.Text}'");
+            dataGridView1.DataSource = repo.read<Product>();
+            MessageBox.Show("Данные удалены");
+        }
+        catch
+        {
+            MessageBox.Show("Ошибка");
+        }
+    }
+}
